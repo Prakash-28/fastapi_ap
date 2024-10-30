@@ -1,25 +1,16 @@
-# app/database.py
+# app/main.py
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from app.config import DATABASE_URL
+from fastapi import FastAPI
+from app.database import engine, metadata
+from app.api import endpoints
 
-# Update DATABASE_URL to be compatible with asyncpg
-DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+app = FastAPI()
 
-# Create async engine
-engine = create_async_engine(DATABASE_URL, echo=True)
+# Create all tables in the database (only needed once)
+@app.on_event("startup")
+async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(metadata.create_all)
 
-# Create metadata and Base for models
-Base = declarative_base()
-metadata = Base.metadata
-
-# Create async session factory
-async_session = sessionmaker(
-    engine, class_=AsyncSession, expire_on_commit=False
-)
-
-# Dependency to get the session for each request
-async def get_session() -> AsyncSession:
-    async with async_session() as session:
-        yield session
+# Include router with API endpoints
+app.include_router(endpoints.router)
